@@ -13,6 +13,7 @@ import org.hibernate.cfg.Configuration;
 import org.hibernate.cfg.NamingStrategy;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.dialect.MySQLDialect;
+import org.hibernate.envers.configuration.spi.AuditConfiguration;
 
 /**
  * Base class for all Hibernate Databases. This extension interacts with Hibernate by creating standard liquibase.database.Database implementations that
@@ -45,7 +46,8 @@ public abstract class HibernateDatabase extends AbstractJdbcDatabase {
             configureNamingStrategy(this.configuration, ((HibernateConnection) ((JdbcConnection) conn).getUnderlyingConnection()));
 
             this.configuration.buildMappings();
-            this.dialect = configureDialect();
+            AuditConfiguration.getFor(configuration);
+            this.dialect = configureDialect(((HibernateConnection) ((JdbcConnection) conn).getUnderlyingConnection()));
 
             afterSetup();
         } catch (DatabaseException e) {
@@ -57,9 +59,17 @@ public abstract class HibernateDatabase extends AbstractJdbcDatabase {
     /**
      * Return the dialect used by hibernate
      */
-    protected Dialect configureDialect() throws DatabaseException {
+    protected Dialect configureDialect(HibernateConnection connection) throws DatabaseException {
         Dialect dialect;
-        String dialectString = configuration.getProperty("hibernate.dialect");
+
+        // Attempt to set dialect string from the JDBC url string
+        String dialectString = connection.getProperties().getProperty("hibernate.dialect");
+
+        if (dialectString == null) {
+            configuration.getProperty("hibernate.dialect");
+        }
+
+
         if (dialectString != null)
             try {
                 dialect = (Dialect) Class.forName(dialectString).newInstance();
